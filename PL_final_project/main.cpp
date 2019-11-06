@@ -8,44 +8,33 @@ using namespace peg;
 int main(int argc, const char** argv)
 {
 
-    //\/ "print" '(' Call_args ')'
-    auto grammar = R"(
+    auto grammar_t = R"(
+        # Grammar for Smurf
         Program     <- Code
-        Comment     <- "#" r'.*'
+        Comment     <- '#' '.*'
         Code        <- Statement*
-        Statement   <- "let" Var_dec
-                     / Assign
-                     / Expr
-        Var_dec     <- Dec ("," Dec)*
-        Dec         <- Ident ("=" Expr)?
+        Statement   <- 'let' Var_Dec / Assignment / Expr
+        Var_Dec     <- Dec (',' Dec)*
+        Dec         <- Ident ('=' Expr)?
         Ident       <- [a-z][a-zA-Z_0-9]*
         Var_ref     <- Ident
-        If_expr     <- Expr Braces ( "else" Braces )?
-        Assign      <- Ident "=" Expr
-        Expr        <- "fn" Func_def / "if" If_expr / Bool_expr / Arith_expr
+        If_expr     <- Expr Braces ("else" Braces)?
+        Assignment  <- Ident '=' Expr
+        Expr        <- 'fn' Func_def / 'if' If_expr / Bool_expr / Arith_expr
         Bool_expr   <- Arith_expr Relop Arith_expr
-        Arith_expr  <- Mult_term addop Arith_expr / Mult_term
-        Mult_term   <- P Mulop Mult_term / P
-        P           <- Integer / Func_call / Var_ref / '(' Arith_expr ')'
-        Integer     <- "-"? [0-9]+
+        Arith_expr  <- Mul_term Addop Arith_expr / Mul_term
+        Mul_term    <- Primary Mulop Mul_term / Primary
+        Primary     <- Int / Func_call / Var_ref / '(' Arith_expr ')'
+        Int         <- '-'? [0-9]+
         Addop       <- '+' / '-'
         Mulop       <- '*' / '/'
         Relop       <- '==' / '!=' / '>=' / '>' / '<=' / '<'
-        Func_call   <- Var_ref '(' Call_args ')'
-        Call_args   <- (Expr ("," Expr)*)?
-        Func_def    <- Param_list Braces
-        Param_list  <- '(' Ident ("," Ident)* ')' / '(' ')'
-        Braces      <- "{" Code "}"
+        Func_call   <- Var_ref '(' Call_args ')' / 'print(' Call_args ')'
+        Call_args   <- (Expr (',' Expr)*)?
+        Func_def    <- Params Braces
+        Params      <- '(' Ident (',' Ident)* ')' / '(' ')'
+        Braces      <- '{' Code '}'
         %whitespace <- [ \t\r\n]*
-    )";
-
-    auto grammar_t = R"(
-        # Grammar for Calculator...
-        Additive    <- Multitive '+' Additive / Multitive
-        Multitive   <- Primary '*' Multitive / Primary
-        Primary     <- '(' Additive ')' / Number
-        Number      <- < [0-9]+ >
-        %whitespace <- [ \t]*
     )";
 
     parser parser;

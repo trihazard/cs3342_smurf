@@ -5,7 +5,32 @@
 using namespace std;
 using namespace peg;
 
-int main(int argc, const char** argv)
+int evaluate(const Ast& ast);
+int evaluate_arithmeticTerms(const Ast& ast);
+int evaluate_multTerms(const Ast& ast);
+
+Ast visit_arithmetic_expression(Ast& node);
+Ast visit_mult_term(Ast& node);
+Ast visit_integer(Ast& node);
+
+
+struct OperationNode {
+    OperationNode(Ast& l, Ast& v, Ast& r)
+        : left(l), verb(v), right(r) {}
+
+    Ast& left;
+    Ast& verb;
+    Ast& right;
+};
+
+struct IntegerNode {
+    IntegerNode(int val)
+        : value(val) {}
+
+    int value;
+};
+
+int main(/*int argc, const char** argv*/)
 {
 
     auto grammar_t = R"(
@@ -38,8 +63,10 @@ int main(int argc, const char** argv)
     )";
 
     parser parser;
-    auto ok = parser.load_grammar(grammar_t);
-    assert(ok);
+    if(!parser.load_grammar(grammar_t)) {
+        throw logic_error("Invalid PEG grammar");
+    }
+
     parser.log = [](size_t line, size_t col, const string& msg) {
         cerr << line << ":" << col << ": " << msg << "\n";
     };
@@ -47,9 +74,39 @@ int main(int argc, const char** argv)
     parser.enable_packrat_parsing();
 
     shared_ptr<Ast> ast;
-    if(parser.parse("print(3)", ast)) {
-        cout << ast_to_s(ast) << endl;
+    if(parser.parse("2 * 5 * 3*2", ast)) {
         ast = AstOptimizer(true).optimize(ast);
-        cout << ast_to_s(ast);
+        cout << ast_to_s(ast) << endl;
+        cout << evaluate(*ast) << endl;
     }
+}
+
+int evaluate(const Ast& ast) {
+    int result;
+    //TODO: The if statements need to account for any and all "leaf nodes" of the AST (I know it's a vector just bear with me)
+    if(ast.name == "Int") {
+        return stol(ast.token);
+    } else {
+        const auto& subAst = ast.nodes;
+        result = evaluate(*subAst[0]);
+        for(unsigned int j = 1; j<subAst.size(); j+=2) {
+            auto rightSide = evaluate(*subAst[j+1]);
+            auto operation = subAst[j]->token;
+            if(operation == "*")
+                result *= rightSide;
+            else if(operation == "/")
+                result /= rightSide;
+            else if(operation == "+")
+                result += rightSide;
+            else if(operation == "-")
+                result -= rightSide;
+
+        }
+    }
+
+//    const auto& nodes = ast.nodes;
+//    for(unsigned int j = 0; j < nodes.size(); j++)  {
+//        cout << nodes[j]->name;
+//    }
+    return result;
 }

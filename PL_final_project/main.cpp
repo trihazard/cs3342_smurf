@@ -1,17 +1,21 @@
 #include <iostream>
 #include <peglib.h>
 #include <assert.h>
+#include <string>
+#include <map>
 
 using namespace std;
 using namespace peg;
 
-int evaluate(const Ast& ast);
-int evaluate_arithmeticTerms(const Ast& ast);
-int evaluate_multTerms(const Ast& ast);
+int evaluate(const Ast& ast, map<string, int> &binding);
+int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding);
+int evaluate_mulTerms(const Ast& ast, map<string, int> &binding);
+int evaluate_varDec(const Ast& ast, map<string, int> &binding);
+int evaluate_assignment(const Ast& ast, map<string, int> &binding);
 
-Ast visit_arithmetic_expression(Ast& node);
-Ast visit_mult_term(Ast& node);
-Ast visit_integer(Ast& node);
+Ast visit_arithmetic_expression(Ast& ast);
+Ast visit_mult_term(Ast& ast);
+Ast visit_integer(Ast& ast);
 
 
 struct OperationNode {
@@ -32,7 +36,7 @@ struct IntegerNode {
 
 int main(/*int argc, const char** argv*/)
 {
-
+    map<string, int> binding;
     auto grammar_t = R"(
         # Grammar for Smurf
         Program     <- Code
@@ -74,23 +78,44 @@ int main(/*int argc, const char** argv*/)
     parser.enable_packrat_parsing();
 
     shared_ptr<Ast> ast;
-    if(parser.parse("2 * 5 * 3*2", ast)) {
+    if(parser.parse("let a = 1 \nb = 3 \na = 8", ast)) {
         ast = AstOptimizer(true).optimize(ast);
         cout << ast_to_s(ast) << endl;
-        cout << evaluate(*ast) << endl;
+        cout << evaluate(*ast, binding) << endl;
     }
 }
 
-int evaluate(const Ast& ast) {
-    int result;
+int evaluate(const Ast& ast, map<string, int> &binding) {
+    int result = 0;
     //TODO: The if statements need to account for any and all "leaf nodes" of the AST (I know it's a vector just bear with me)
+    if(ast.name == "Int") {
+        return stol(ast.token);
+    } else if(ast.name == "Arith_expr") {
+        return evaluate_arithmeticTerms(ast, binding);
+    } else if(ast.name == "Mul_term") {
+        return evaluate_mulTerms(ast, binding);
+    } else if(ast.name == "Dec") {
+        return evaluate_varDec(ast, binding);
+    } else if(ast.name == "Assignment") {
+        return evaluate_assignment(ast, binding);
+    } else {
+        const auto& subAst = ast.nodes;
+        for(unsigned int j = 0; j < subAst.size(); j++) {
+            result = evaluate(*subAst[j], binding);
+        }
+    }
+    return result;
+}
+
+int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding) {
+    int result;
     if(ast.name == "Int") {
         return stol(ast.token);
     } else {
         const auto& subAst = ast.nodes;
-        result = evaluate(*subAst[0]);
+        result = evaluate(*subAst[0], binding);
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
-            auto rightSide = evaluate(*subAst[j+1]);
+            auto rightSide = evaluate(*subAst[j+1], binding);
             auto operation = subAst[j]->token;
             if(operation == "*")
                 result *= rightSide;
@@ -103,10 +128,48 @@ int evaluate(const Ast& ast) {
 
         }
     }
-
-//    const auto& nodes = ast.nodes;
-//    for(unsigned int j = 0; j < nodes.size(); j++)  {
-//        cout << nodes[j]->name;
-//    }
     return result;
+}
+
+int evaluate_mulTerms(const Ast& ast, map<string, int> &binding) {
+    int result;
+    if(ast.name == "Int") {
+        return stol(ast.token);
+    } else {
+        const auto& subAst = ast.nodes;
+        result = evaluate(*subAst[0], binding);
+        for(unsigned int j = 1; j<subAst.size(); j+=2) {
+            auto rightSide = evaluate(*subAst[j+1], binding);
+            auto operation = subAst[j]->token;
+            if(operation == "*")
+                result *= rightSide;
+            else if(operation == "/")
+                result /= rightSide;
+            else if(operation == "+")
+                result += rightSide;
+            else if(operation == "-")
+                result -= rightSide;
+
+        }
+    }
+    return result;
+}
+
+int evaluate_varDec(const Ast& ast, map<string, int> &binding) {
+    auto iter = binding.find(ast.nodes[0]->token);
+    if(iter == binding.end()) {
+        binding.insert(pair<string,int>(ast.nodes[0]->token, stol(ast.nodes[1]->token)));
+    } else {
+        throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
+    }
+}
+
+int evaluate_assignment(const Ast& ast, map<string, int> &binding) {
+    auto iter = binding.find(ast.nodes[0]->token);
+    if(iter != binding.end()) {
+        int newValue = evaluate(*ast.nodes[1], binding);
+        return iter->second = newValue;
+    } else {
+        throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
+    }
 }

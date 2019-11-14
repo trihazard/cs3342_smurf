@@ -11,7 +11,9 @@ int evaluate(const Ast& ast, map<string, int> &binding);
 int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding);
 int evaluate_mulTerms(const Ast& ast, map<string, int> &binding);
 int evaluate_varDec(const Ast& ast, map<string, int> &binding);
+int evaluate_Dec(const Ast& ast, map<string, int> &binding);
 int evaluate_assignment(const Ast& ast, map<string, int> &binding);
+int evaluate_funcCall(const Ast& ast, map<string, int> &binding);
 
 Ast visit_arithmetic_expression(Ast& ast);
 Ast visit_mult_term(Ast& ast);
@@ -34,13 +36,16 @@ struct IntegerNode {
     int value;
 };
 
-int main(/*int argc, const char** argv*/)
-{
+int main(/*int argc, const char** argv*/) {
+
     map<string, int> binding;
     auto grammar_t = R"(
         # Grammar for Smurf
         Program     <- Code
-        Comment     <- '#' .*
+        Comment     <- '#' (!End .)* &End
+        End         <-  EndOfLine / EndOfFile
+        EndOfLine   <-  '\r\n' / '\n' / '\r'
+        EndOfFile   <-  !.
         Code        <- Statement*
         Statement   <- 'let' Var_Dec / Assignment / Expr
         Var_Dec     <- Dec (',' Dec)*
@@ -58,12 +63,13 @@ int main(/*int argc, const char** argv*/)
         Addop       <- '+' / '-'
         Mulop       <- '*' / '/'
         Relop       <- '==' / '!=' / '>=' / '>' / '<=' / '<'
-        Func_call   <- 'print' '(' Call_args ')' / Var_ref '(' Call_args ')'
+        Func_call   <- Print_call '(' Call_args ')' / Var_ref '(' Call_args ')'
+        Print_call  <- 'print'
         Call_args   <- (Expr (',' Expr)*)?
         Func_def    <- Params Braces
         Params      <- '(' Ident (',' Ident)* ')' / '(' ')'
         Braces      <- '{' Code '}'
-        %whitespace <- [ \t\r\n]*
+        %whitespace <- ([ \t\r\n] / Comment)*
     )";
 
     parser parser;
@@ -78,7 +84,8 @@ int main(/*int argc, const char** argv*/)
     parser.enable_packrat_parsing();
 
     shared_ptr<Ast> ast;
-    if(parser.parse("let a = 1 \nb = 3 \na = 8", ast)) {
+    if(parser.parse("let a = 4, b = 8 \nif a<5 {a=10}", ast)) {
+        cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
         cout << ast_to_s(ast) << endl;
         cout << evaluate(*ast, binding) << endl;
@@ -87,17 +94,20 @@ int main(/*int argc, const char** argv*/)
 
 int evaluate(const Ast& ast, map<string, int> &binding) {
     int result = 0;
-    //TODO: The if statements need to account for any and all "leaf nodes" of the AST (I know it's a vector just bear with me)
     if(ast.name == "Int") {
         return stol(ast.token);
     } else if(ast.name == "Arith_expr") {
         return evaluate_arithmeticTerms(ast, binding);
     } else if(ast.name == "Mul_term") {
         return evaluate_mulTerms(ast, binding);
-    } else if(ast.name == "Dec") {
+    } else if(ast.name == "Var_Dec") {
         return evaluate_varDec(ast, binding);
+    } else if(ast.name == "Dec") {
+        return evaluate_Dec(ast, binding);
     } else if(ast.name == "Assignment") {
         return evaluate_assignment(ast, binding);
+    } else if(ast.name == "Func_call") {
+        return evaluate_funcCall(ast, binding);
     } else {
         const auto& subAst = ast.nodes;
         for(unsigned int j = 0; j < subAst.size(); j++) {
@@ -117,11 +127,7 @@ int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding) {
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
             auto rightSide = evaluate(*subAst[j+1], binding);
             auto operation = subAst[j]->token;
-            if(operation == "*")
-                result *= rightSide;
-            else if(operation == "/")
-                result /= rightSide;
-            else if(operation == "+")
+            if(operation == "+")
                 result += rightSide;
             else if(operation == "-")
                 result -= rightSide;
@@ -145,17 +151,21 @@ int evaluate_mulTerms(const Ast& ast, map<string, int> &binding) {
                 result *= rightSide;
             else if(operation == "/")
                 result /= rightSide;
-            else if(operation == "+")
-                result += rightSide;
-            else if(operation == "-")
-                result -= rightSide;
-
         }
     }
     return result;
 }
 
 int evaluate_varDec(const Ast& ast, map<string, int> &binding) {
+    const auto varsToDeclare = ast.nodes;
+    int result = 0;
+    for(unsigned int j = 0; j < varsToDeclare.size(); j++) {
+        result = evaluate_Dec(*varsToDeclare[j], binding);
+    }
+    return result;
+}
+
+int evaluate_Dec(const Ast& ast, map<string, int> &binding) {
     auto iter = binding.find(ast.nodes[0]->token);
     if(iter == binding.end()) {
         binding.insert(pair<string,int>(ast.nodes[0]->token, stol(ast.nodes[1]->token)));
@@ -171,5 +181,14 @@ int evaluate_assignment(const Ast& ast, map<string, int> &binding) {
         return iter->second = newValue;
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
+    }
+}
+
+int evaluate_funcCall(const Ast& ast, map<string, int> &binding) {
+    const auto func = ast.nodes;
+    if(func[0]->name == "Print_call") {
+        int toOutput = evaluate(*func[1], binding);
+        cout << toOutput << endl;
+        return toOutput;
     }
 }

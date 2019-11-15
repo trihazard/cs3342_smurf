@@ -1,3 +1,10 @@
+/*
+ * TODO:
+ * Function calls in general
+ * Function calls during arithmetic/Mult expressions
+ *
+ */
+
 #include <iostream>
 #include <peglib.h>
 #include <assert.h>
@@ -7,12 +14,15 @@
 using namespace std;
 using namespace peg;
 
+int getVar(string ident, map<string, int> &binding);
 int evaluate(const Ast& ast, map<string, int> &binding);
 int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding);
 int evaluate_mulTerms(const Ast& ast, map<string, int> &binding);
 int evaluate_varDec(const Ast& ast, map<string, int> &binding);
 int evaluate_Dec(const Ast& ast, map<string, int> &binding);
 int evaluate_assignment(const Ast& ast, map<string, int> &binding);
+int evaluate_boolExpr(const Ast& ast, map<string, int> &binding);
+int evaluate_ifExpr(const Ast& ast, map<string, int> &binding);
 int evaluate_funcCall(const Ast& ast, map<string, int> &binding);
 
 Ast visit_arithmetic_expression(Ast& ast);
@@ -84,11 +94,20 @@ int main(/*int argc, const char** argv*/) {
     parser.enable_packrat_parsing();
 
     shared_ptr<Ast> ast;
-    if(parser.parse("let a = 4, b = 8 \nif a<5 {a=10}", ast)) {
+    if(parser.parse("let a = 10\n if a<5 {a=10} else {a=2}", ast)) {
         cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
         cout << ast_to_s(ast) << endl;
         cout << evaluate(*ast, binding) << endl;
+    }
+}
+
+int getVar(string ident, map<string, int> &binding) {
+    auto iter = binding.find(ident);
+    if(iter != binding.end()) {
+        return iter->second;
+    } else {
+        throw runtime_error("Variable " + ident + "has not been defined");
     }
 }
 
@@ -106,6 +125,10 @@ int evaluate(const Ast& ast, map<string, int> &binding) {
         return evaluate_Dec(ast, binding);
     } else if(ast.name == "Assignment") {
         return evaluate_assignment(ast, binding);
+    } else if(ast.name == "Bool_expr") {
+        return evaluate_boolExpr(ast, binding);
+    } else if(ast.name == "If_expr") {
+        return evaluate_ifExpr(ast, binding);
     } else if(ast.name == "Func_call") {
         return evaluate_funcCall(ast, binding);
     } else {
@@ -121,6 +144,8 @@ int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
+    } else if(ast.name == "Ident") {
+        return getVar(ast.token, binding);
     } else {
         const auto& subAst = ast.nodes;
         result = evaluate(*subAst[0], binding);
@@ -141,6 +166,8 @@ int evaluate_mulTerms(const Ast& ast, map<string, int> &binding) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
+    } else if(ast.name == "Ident") {
+        return getVar(ast.token, binding);
     } else {
         const auto& subAst = ast.nodes;
         result = evaluate(*subAst[0], binding);
@@ -182,6 +209,41 @@ int evaluate_assignment(const Ast& ast, map<string, int> &binding) {
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
     }
+}
+
+int evaluate_boolExpr(const Ast& ast, map<string, int> &binding) {
+    //'==' / '!=' / '>=' / '>' / '<=' / '<'
+    int eval = 0;
+    const auto fullExpr = ast.nodes;
+    int leftSide = evaluate_arithmeticTerms(*fullExpr[0], binding);
+    int rightSide = evaluate_arithmeticTerms(*fullExpr[2], binding);
+    auto operation = fullExpr[1]->token;
+    if(operation == "==") {
+        eval = int(leftSide == rightSide);
+    } else if(operation == "!=") {
+        eval = int(leftSide != rightSide);
+    } else if(operation == ">=") {
+        eval = int(leftSide >= rightSide);
+    } else if(operation == ">") {
+        eval = int(leftSide > rightSide);
+    } else if(operation == "<=") {
+        eval = int(leftSide <= rightSide);
+    } else {
+        //it is guaranteed that the operator is '<' if it gets here, since the operator definition is a terminal
+        eval = int(leftSide < rightSide);
+    }
+    return eval;
+}
+
+int evaluate_ifExpr(const Ast& ast, map<string, int> &binding) {
+    const auto nodes = ast.nodes;
+    int pretendBool = evaluate(*nodes[0], binding);
+
+    if(pretendBool != 0)
+        return evaluate(*nodes[1], binding);
+
+    if(nodes.size() == 3)
+        return evaluate(*nodes[2], binding);
 }
 
 int evaluate_funcCall(const Ast& ast, map<string, int> &binding) {

@@ -1,5 +1,13 @@
 /*
  * TODO:
+ * Finish structs needed for closure and functions
+ * RECHECK EVERYTHING BECAUSE I WAS ASLEEP WHILE WRITING THEM
+ *
+ * Do I want an evaluate function defined for Value struct?
+ *  - YES I DO - means I don't have to check the actual variable's type in my parsing logic
+ *
+ * Fix arithmetic
+ *  - since nodes contain other nodes and recursion is used the math is done right to left
  * Function calls in general
  * Function calls during arithmetic/Mult expressions
  *
@@ -44,6 +52,74 @@ struct IntegerNode {
         : value(val) {}
 
     int value;
+};
+
+struct Value {
+    enum Type {Int, Function};
+
+    Value(int val): type(Int), value(val) {}
+    //This constructor may need to change
+    Value(Ast& ast): type(Function), value(ast) {}
+
+    Value& operator=(const Value& rhs) {
+      if (this != &rhs) {
+        type = rhs.type;
+        value = rhs.value;
+      }
+      return *this;
+    }
+
+    Type type;
+    peg::any value;
+};
+
+struct Closure {
+    Closure(shared_ptr<Closure> parent = nullptr)
+        : level(parent ? parent->level + 1 : 0) {}
+
+    void linkParent(shared_ptr<Closure> outerLayer) {
+        if(this->parent)
+            this->parent->linkParent(outerLayer);
+        else
+            this->parent = outerLayer;
+    }
+
+    bool contains(string s) {
+        if(binding.find(s) != binding.end())
+            return true;
+
+        return parent && parent->contains(s);
+    }
+
+    Value& get(string s) {
+        if(binding.find(s) != binding.end())
+            return binding.at(s);
+        else if(parent)
+            return parent->get(s);
+        else
+            throw runtime_error("Variable '" + s + "' is not defined");
+    }
+
+    void declare(string s, Value value) {
+        if(binding.find(s) == binding.end())
+            binding[s] = value;
+        else
+            throw runtime_error("Variable '" + s + "'already defined");
+    }
+
+    void assign(string& s, Value& value) {
+      if (binding.find(s) != binding.end()) {
+        Value& thing = binding[s];
+        thing.value = value;
+        return;
+      }
+      parent->assign(s, value);
+      return;
+    }
+
+    map<string, Value> binding;
+    shared_ptr<Closure> parent;
+    int level;
 };
 
 int main(/*int argc, const char** argv*/) {
@@ -250,7 +326,7 @@ int evaluate_funcCall(const Ast& ast, map<string, int> &binding) {
     const auto func = ast.nodes;
     if(func[0]->name == "Print_call") {
         int toOutput = evaluate(*func[1], binding);
-        cout << toOutput << endl;
+        cout << "Print: " << toOutput << endl;
         return toOutput;
     }
 }

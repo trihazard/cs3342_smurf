@@ -1,5 +1,5 @@
-/*
- * TODO:
+/* TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!KLKLJKJ!!!!!!!!!!!!!!
+ *
  * Finish structs needed for closure and functions
  * RECHECK EVERYTHING BECAUSE I WAS ASLEEP WHILE WRITING THEM
  *
@@ -14,6 +14,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 #include <peglib.h>
 #include <assert.h>
 #include <string>
@@ -57,9 +58,9 @@ struct IntegerNode {
 struct Value {
     enum Type {Int, Function};
 
-    Value(int val): type(Int), value(val) {}
+    explicit Value(int val = 0): type(Int), value(val) {}
     //This constructor may need to change
-    Value(Ast& ast): type(Function), value(ast) {}
+    explicit Value(Ast& ast): type(Function), value(ast) {}
 
     Value& operator=(const Value& rhs) {
       if (this != &rhs) {
@@ -67,6 +68,17 @@ struct Value {
         value = rhs.value;
       }
       return *this;
+    }
+
+    int evaluate() {
+        switch (this->type) {
+            case Int:
+                return this->value.get<int>();
+
+            case Function:
+                //TODO DFLSKFSDKJFL
+                break;
+        }
     }
 
     Type type;
@@ -104,7 +116,7 @@ struct Closure {
         if(binding.find(s) == binding.end())
             binding[s] = value;
         else
-            throw runtime_error("Variable '" + s + "'already defined");
+            throw runtime_error("Variable '" + s + "' already defined");
     }
 
     void assign(string& s, Value& value) {
@@ -122,7 +134,7 @@ struct Closure {
     int level;
 };
 
-int main(/*int argc, const char** argv*/) {
+int main(int argc, const char** argv) {
 
     map<string, int> binding;
     auto grammar_t = R"(
@@ -157,6 +169,23 @@ int main(/*int argc, const char** argv*/) {
         Braces      <- '{' Code '}'
         %whitespace <- ([ \t\r\n] / Comment)*
     )";
+    ifstream smurfFile;
+    if(argc > 2)
+        throw logic_error("Invalid number of inputs passed to program");
+
+    smurfFile.open(argv[1]);
+    char* smurfCode;
+    if (smurfFile) {
+        smurfFile.seekg(0, smurfFile.end);
+        int length = smurfFile.tellg();
+        smurfFile.seekg(0, smurfFile.beg);
+        smurfCode = new char[length+1];
+        smurfFile.read(smurfCode, length);
+        smurfCode[length] = '\0';
+        smurfFile.close();
+    } else {
+        throw logic_error("Invalid file name");
+    }
 
     parser parser;
     if(!parser.load_grammar(grammar_t)) {
@@ -170,12 +199,14 @@ int main(/*int argc, const char** argv*/) {
     parser.enable_packrat_parsing();
 
     shared_ptr<Ast> ast;
-    if(parser.parse("let a = 10\n if a<5 {a=10} else {a=2}", ast)) {
+    if(parser.parse(smurfCode, ast)) {
         cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
         cout << ast_to_s(ast) << endl;
         cout << evaluate(*ast, binding) << endl;
     }
+
+    delete[] smurfCode;
 }
 
 int getVar(string ident, map<string, int> &binding) {
@@ -191,6 +222,8 @@ int evaluate(const Ast& ast, map<string, int> &binding) {
     int result = 0;
     if(ast.name == "Int") {
         return stol(ast.token);
+    } else if(ast.name == "Ident") {
+        return getVar(ast.token, binding);
     } else if(ast.name == "Arith_expr") {
         return evaluate_arithmeticTerms(ast, binding);
     } else if(ast.name == "Mul_term") {
@@ -270,8 +303,9 @@ int evaluate_varDec(const Ast& ast, map<string, int> &binding) {
 
 int evaluate_Dec(const Ast& ast, map<string, int> &binding) {
     auto iter = binding.find(ast.nodes[0]->token);
+    auto value = evaluate(*ast.nodes[1], binding);
     if(iter == binding.end()) {
-        binding.insert(pair<string,int>(ast.nodes[0]->token, stol(ast.nodes[1]->token)));
+        binding.insert(pair<string,int>(ast.nodes[0]->token, value));
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
     }
@@ -324,8 +358,16 @@ int evaluate_ifExpr(const Ast& ast, map<string, int> &binding) {
 
 int evaluate_funcCall(const Ast& ast, map<string, int> &binding) {
     const auto func = ast.nodes;
+    int toOutput = 0;
     if(func[0]->name == "Print_call") {
-        int toOutput = evaluate(*func[1], binding);
+        if(func[1]->name == "Call_args") {
+            for(unsigned int j = 0; j < func[1]->nodes.size(); j++) {
+                toOutput = evaluate(*func[1]->nodes[j], binding);
+                cout << "Print: " << toOutput << endl;
+            }
+            return toOutput;
+        }
+        toOutput = evaluate(*func[1], binding);
         cout << "Print: " << toOutput << endl;
         return toOutput;
     }

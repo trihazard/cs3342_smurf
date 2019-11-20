@@ -23,22 +23,6 @@
 using namespace std;
 using namespace peg;
 
-int getVar(string ident, map<string, int> &binding);
-int evaluate(const Ast& ast, map<string, int> &binding);
-int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding);
-int evaluate_mulTerms(const Ast& ast, map<string, int> &binding);
-int evaluate_varDec(const Ast& ast, map<string, int> &binding);
-int evaluate_Dec(const Ast& ast, map<string, int> &binding);
-int evaluate_assignment(const Ast& ast, map<string, int> &binding);
-int evaluate_boolExpr(const Ast& ast, map<string, int> &binding);
-int evaluate_ifExpr(const Ast& ast, map<string, int> &binding);
-int evaluate_funcCall(const Ast& ast, map<string, int> &binding);
-
-Ast visit_arithmetic_expression(Ast& ast);
-Ast visit_mult_term(Ast& ast);
-Ast visit_integer(Ast& ast);
-
-
 struct OperationNode {
     OperationNode(Ast& l, Ast& v, Ast& r)
         : left(l), verb(v), right(r) {}
@@ -63,11 +47,15 @@ struct Value {
     explicit Value(Ast& ast): type(Function), value(ast) {}
 
     Value& operator=(const Value& rhs) {
-      if (this != &rhs) {
-        type = rhs.type;
-        value = rhs.value;
-      }
+      type = rhs.type;
+      value = rhs.value;
       return *this;
+    }
+
+    Value& operator=(const int rhs) {
+        type = Int;
+        value = rhs;
+        return *this;
     }
 
     int evaluate() {
@@ -134,9 +122,26 @@ struct Closure {
     int level;
 };
 
-int main(int argc, const char** argv) {
+int getVar(string ident, map<string, Value> &binding);
+int evaluate(const Ast& ast, map<string, Value> &binding);
+int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding);
+int evaluate_mulTerms(const Ast& ast, map<string, Value> &binding);
+int evaluate_varDec(const Ast& ast, map<string, Value> &binding);
+int evaluate_Dec(const Ast& ast, map<string, Value> &binding);
+int evaluate_assignment(const Ast& ast, map<string, Value> &binding);
+int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding);
+int evaluate_ifExpr(const Ast& ast, map<string, Value> &binding);
+int evaluate_funcCall(const Ast& ast, map<string, Value> &binding);
 
-    map<string, int> binding;
+Ast visit_arithmetic_expression(Ast& ast);
+Ast visit_mult_term(Ast& ast);
+Ast visit_integer(Ast& ast);
+
+
+
+int main(int argc, const char** argv) {
+    Closure scope;
+    map<string, Value> binding;
     auto grammar_t = R"(
         # Grammar for Smurf
         Program     <- Code
@@ -154,8 +159,8 @@ int main(int argc, const char** argv) {
         Assignment  <- Ident '=' Expr
         Expr        <- 'fn' Func_def / 'if' If_expr / Bool_expr / Arith_expr
         Bool_expr   <- Arith_expr Relop Arith_expr
-        Arith_expr  <- Mul_term Addop Arith_expr / Mul_term
-        Mul_term    <- Primary Mulop Mul_term / Primary
+        Arith_expr  <- Mul_term (Addop Mul_term)* / Mul_term
+        Mul_term    <- Primary (Mulop Primary)* / Primary
         Primary     <- Int / Func_call / Var_ref / '(' Arith_expr ')'
         Int         <- < '-'? [0-9]+ >
         Addop       <- '+' / '-'
@@ -209,16 +214,16 @@ int main(int argc, const char** argv) {
     delete[] smurfCode;
 }
 
-int getVar(string ident, map<string, int> &binding) {
+int getVar(string ident, map<string, Value> &binding) {
     auto iter = binding.find(ident);
     if(iter != binding.end()) {
-        return iter->second;
+        return iter->second.evaluate();
     } else {
         throw runtime_error("Variable " + ident + "has not been defined");
     }
 }
 
-int evaluate(const Ast& ast, map<string, int> &binding) {
+int evaluate(const Ast& ast, map<string, Value> &binding) {
     int result = 0;
     if(ast.name == "Int") {
         return stol(ast.token);
@@ -249,7 +254,7 @@ int evaluate(const Ast& ast, map<string, int> &binding) {
     return result;
 }
 
-int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding) {
+int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
@@ -271,7 +276,7 @@ int evaluate_arithmeticTerms(const Ast& ast, map<string, int> &binding) {
     return result;
 }
 
-int evaluate_mulTerms(const Ast& ast, map<string, int> &binding) {
+int evaluate_mulTerms(const Ast& ast, map<string, Value> &binding) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
@@ -292,7 +297,7 @@ int evaluate_mulTerms(const Ast& ast, map<string, int> &binding) {
     return result;
 }
 
-int evaluate_varDec(const Ast& ast, map<string, int> &binding) {
+int evaluate_varDec(const Ast& ast, map<string, Value> &binding) {
     const auto varsToDeclare = ast.nodes;
     int result = 0;
     for(unsigned int j = 0; j < varsToDeclare.size(); j++) {
@@ -301,27 +306,44 @@ int evaluate_varDec(const Ast& ast, map<string, int> &binding) {
     return result;
 }
 
-int evaluate_Dec(const Ast& ast, map<string, int> &binding) {
+int evaluate_Dec(const Ast& ast, map<string, Value> &binding) {
     auto iter = binding.find(ast.nodes[0]->token);
-    auto value = evaluate(*ast.nodes[1], binding);
     if(iter == binding.end()) {
-        binding.insert(pair<string,int>(ast.nodes[0]->token, value));
+        if(ast.nodes[1]->name == "Func_def") {
+            auto value = Value(*ast.nodes[1]);
+            binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            return 1;
+        } else {
+            auto almostValue = evaluate(*ast.nodes[1], binding);
+            auto value = Value(almostValue);
+            binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            return almostValue;
+        }
+
+        //binding.insert(pair<string,int>(ast.nodes[0]->token, value));
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
     }
 }
 
-int evaluate_assignment(const Ast& ast, map<string, int> &binding) {
+int evaluate_assignment(const Ast& ast, map<string, Value> &binding) {
     auto iter = binding.find(ast.nodes[0]->token);
     if(iter != binding.end()) {
-        int newValue = evaluate(*ast.nodes[1], binding);
-        return iter->second = newValue;
+        if(ast.nodes[1]->name == "Func_def") {
+            auto value = Value(*ast.nodes[1]);
+            iter->second = value;
+            return 1;
+        } else {
+            int value = evaluate(*ast.nodes[1], binding);
+            iter->second = value;
+            return value;
+        }
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
     }
 }
 
-int evaluate_boolExpr(const Ast& ast, map<string, int> &binding) {
+int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding) {
     //'==' / '!=' / '>=' / '>' / '<=' / '<'
     int eval = 0;
     const auto fullExpr = ast.nodes;
@@ -345,7 +367,7 @@ int evaluate_boolExpr(const Ast& ast, map<string, int> &binding) {
     return eval;
 }
 
-int evaluate_ifExpr(const Ast& ast, map<string, int> &binding) {
+int evaluate_ifExpr(const Ast& ast, map<string, Value> &binding) {
     const auto nodes = ast.nodes;
     int pretendBool = evaluate(*nodes[0], binding);
 
@@ -354,21 +376,28 @@ int evaluate_ifExpr(const Ast& ast, map<string, int> &binding) {
 
     if(nodes.size() == 3)
         return evaluate(*nodes[2], binding);
+
+    return pretendBool;
 }
 
-int evaluate_funcCall(const Ast& ast, map<string, int> &binding) {
+int evaluate_funcCall(const Ast& ast, map<string, Value> &binding) {
     const auto func = ast.nodes;
     int toOutput = 0;
     if(func[0]->name == "Print_call") {
         if(func[1]->name == "Call_args") {
+                cout << "Print: ";
             for(unsigned int j = 0; j < func[1]->nodes.size(); j++) {
                 toOutput = evaluate(*func[1]->nodes[j], binding);
-                cout << "Print: " << toOutput << endl;
+                cout << toOutput;
+                if(j < func[1]->nodes.size()-1)
+                    cout << "|";
             }
+            cout << endl;
+            return toOutput;
+        } else {
+            toOutput = evaluate(*func[1], binding);
+            cout << "Print: " << toOutput << endl;
             return toOutput;
         }
-        toOutput = evaluate(*func[1], binding);
-        cout << "Print: " << toOutput << endl;
-        return toOutput;
     }
 }

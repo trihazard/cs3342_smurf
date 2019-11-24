@@ -1,13 +1,13 @@
 /* TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!KLKLJKJ!!!!!!!!!!!!!!
  *
+ * Add comments to stuff to make it more legible
+ *
  * Finish structs needed for closure and functions
  * RECHECK EVERYTHING BECAUSE I WAS ASLEEP WHILE WRITING THEM
  *
  * Do I want an evaluate function defined for Value struct?
  *  - YES I DO - means I don't have to check the actual variable's type in my parsing logic
  *
- * Fix arithmetic
- *  - since nodes contain other nodes and recursion is used the math is done right to left
  * Function calls in general
  * Function calls during arithmetic/Mult expressions
  *
@@ -23,21 +23,6 @@
 using namespace std;
 using namespace peg;
 
-struct OperationNode {
-    OperationNode(Ast& l, Ast& v, Ast& r)
-        : left(l), verb(v), right(r) {}
-
-    Ast& left;
-    Ast& verb;
-    Ast& right;
-};
-
-struct IntegerNode {
-    IntegerNode(int val)
-        : value(val) {}
-
-    int value;
-};
 
 struct Value {
     enum Type {Int, Function};

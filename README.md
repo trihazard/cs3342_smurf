@@ -9,16 +9,43 @@ recursion, bound variables, conditional logic, and integer arithmetic.
 The language is called Smurf (because it is small, and if languages had colors,
 it would be blue).
 
+### Revision history
+
+11/20/19: added new feature-based testing
+
 # Submission Checklist
+
+**Fill this in before submitting your final pull request**
+
+Name:
+
+SMU ID:
+
+##### Grading criteria (see [Grading](#grading) below):
+
+[ ] test-based
+
+[ ] feature based
+
+If feature based, put an X in the cell that represents the combination of syntax and implementation depth you want me to assess. (Just one X in the table.)
+
+|                            | Parses | Builds AST | Interprets |
+|----------------------------|-------:|-----------:|-----------:|
+| Integers                   |  [ ]   |    [ ]     |    [ ]     |
+| Expressions                |  [ ]   |    [ ]     |    [ ]     |
+| Variables                  |  [ ]   |    [ ]     |    [ ]     |
+| Function calls (no params) |  [ ]   |    [ ]     |    [ ]     |
+| Function calls + bindings  |  [ ]   |    [ ]     |    [ ]     |
+
+
+I've included in this PR:
 
 [ ] everything I'll need to build a running version of your submission (source,
     dependency loading, etc)
 
 [ ] a build file that will create an executable (if required)
 
-[ ] a script that will run the tests.
-
-[ ] packaged into a PR that MUST INCLUDE your SMU ID and name.
+[ ] a script that will run the tests (if you're making a test-based submission)
 
 (see [Deliverables](#deliverables) for more details)
 
@@ -65,6 +92,8 @@ Dockerfile.
 
 Finally, I'll need you to include a script that runs the tests: see the next
 section.
+
+**Do not include any object files, executable files, XCode project files, and the like.**
 
 To summarize, you'll deliver:
 
@@ -365,14 +394,13 @@ This project will count for 40% of the overall course grade.
 
 Within the project, marks are given as follows:
 
+* Demonstrate master of the material: 80%
+* Well coded solution: 20%.
+
+Let's get the "well coded" part out of the way first:
 
 | | |
 |-|-|
-| **Passes Tests** ||
-| Passes all my tests (the `.smu` files in `test_cases/` along with others I have here. | 80% |
-| Passes some of the tests | 80% -2 for each failing|
-| Passes no tests | 0% |
-|**Well coded** ||
 | The code is easy to understand.†            | 12% |
 | Clear division between parsing and runtime  | 4% |
 | Makes good use of features of parsing tool chosen | 4% |
@@ -385,3 +413,59 @@ Within the project, marks are given as follows:
 * complex code broken into smaller less complex chunks
 * consistency
 * and other _I'll know it when I don't understand it_ stuff
+
+
+### Demonstrating Mastery
+
+There are two ways I can grade mastery.
+
+* Test based
+* Feature based
+
+Test-based grading assumes I can run my tests against your code: you will need to have an interpreter that supports at least expressions and the print function.
+
+The feature-based grading is intended to be a fallback in case you have problems getting the interpreter to run. For example, you may be generating an AST and correctly interpreting expressions, but haven't managed to get the `print()` call to run. This would mean you'd fail the test-based grading even though you had some working code.
+
+When you submit your final project, you will need to tell me which grading scheme you want me to use. Do that by editing the form at the top of this README.
+
+
+#### Test-Based Grading of Mastery
+
+Ideally, you will finish all the requirements of the project and produce an interpreter that will be able to execute the tests I supplied. In that case, the mastery grade will simply be the percentage of tests that pass, where all tests passing get you 80%, and no tests passing gets you 0. FYI, there are 57 tests in all so each is worth roughly 1.75% of the mastery component of the grade. Put another way; each failing test would deduct 1.4% from your overall project grade.
+
+#### Feature-Based Grading of Mastery
+
+The interpreter project has two dimensions of features. One is the amount of the overall Smurf language your code handles, and the other is how far down the parsing/AST/interpreting path you are.
+
+|                            | Parses | Builds AST | Interprets |
+|----------------------------|-------:|-----------:|-----------:|
+| Integers                   |   10   |     20     |     40     |
+| Expressions                |   20   |     40     |     60     |
+| Variables                  |   30   |     50     |     80     |
+| Function calls (no params) |   40   |     60     |     85     |
+| Function calls + bindings  |   40   |     60     |     95     |
+
+This means that (for the mastery part of the grade) if your code correctly parses a language that contains a single integer (reporting an error if it is fed something else), you'd score 10% on the mastery section (8% overall). If you built a AST from that integer, you'd get 20%, and it your code interpreted that AST ands output the integer's value, you'd get 40%.
+
+If your code can handle variable declarations and use the values of those variables in expressions, outputting the result, you'd get 80%. If you build the AST for this case, but can't get the interpreter working, you'd instead get 50%.
+
+When you submit your work, you'll tell me which row and column above you want me to use for grading.
+
+#### How to demonstrate features
+
+If your submission is in the _parsing_ column, then you need to submit a program that lets me enter some Smurf syntax as a parameter, and which displays either "correct" or "bad syntax". The syntax I'll feed to this program depends on the row you choose.
+
+If you submit the _AST_ column, then I'll need your program to accept Smurf as a parameter and to output a textual representation of the AST. The easiest way to do this is probably as a nested list:
+
+~~~ sh
+$ myparser "1+2*3"
+(+ 1 (* 2 3))
+~~~
+
+If you're submitting in the _Interprets_ column, then your program should both output the AST and, on the next line, the value returned by the interpretation.
+
+~~~ sh
+$ myparser "a = 3  1+2*a"
+(+ 1 (* 2 (rval a)))
+7
+~~~

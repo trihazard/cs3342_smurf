@@ -4,7 +4,12 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += \
+        ast_node.cpp \
+        interpreter.cpp \
         main.cpp
 
 HEADERS += \
-    peglib.h
+    ast_node.h \
+    interpreter.h \
+    peglib.h \
+    visitor.h

@@ -13,6 +13,7 @@
  *
  */
 
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <peglib.h>
@@ -20,9 +21,39 @@
 #include <string>
 #include <map>
 
+#include "visitor.h"
+#include "ast_node.h"
+#include "interpreter.h"
+
 using namespace std;
 using namespace peg;
 
+
+class Visitor;
+
+class ParseTreeNode {
+    AstNode *content;
+
+public:
+    ParseTreeNode(){};
+    ParseTreeNode(AstNode *content_node) {
+        content = content_node;
+    }
+
+    AstNode *get() const {
+        return content;
+    }
+
+    string to_string() {
+        return content->to_string();
+    }
+};
+
+struct Value;
+struct Closure;
+
+struct FunctionValue {
+};
 
 struct Value {
     enum Type {Int, Function};
@@ -107,6 +138,9 @@ struct Closure {
     int level;
 };
 
+AstNode *bin_op(const SemanticValues &sv);
+void setup_ast_generation(parser &parser);
+
 int getVar(string ident, map<string, Value> &binding);
 int evaluate(const Ast& ast, map<string, Value> &binding);
 int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding);
@@ -117,12 +151,6 @@ int evaluate_assignment(const Ast& ast, map<string, Value> &binding);
 int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding);
 int evaluate_ifExpr(const Ast& ast, map<string, Value> &binding);
 int evaluate_funcCall(const Ast& ast, map<string, Value> &binding);
-
-Ast visit_arithmetic_expression(Ast& ast);
-Ast visit_mult_term(Ast& ast);
-Ast visit_integer(Ast& ast);
-
-
 
 int main(int argc, const char** argv) {
     Closure scope;
@@ -159,23 +187,23 @@ int main(int argc, const char** argv) {
         Braces      <- '{' Code '}'
         %whitespace <- ([ \t\r\n] / Comment)*
     )";
-    ifstream smurfFile;
-    if(argc > 2)
-        throw logic_error("Invalid number of inputs passed to program");
+//    ifstream smurfFile;
+//    if(argc > 2)
+//        throw logic_error("Invalid number of inputs passed to program");
 
-    smurfFile.open(argv[1]);
-    char* smurfCode;
-    if (smurfFile) {
-        smurfFile.seekg(0, smurfFile.end);
-        int length = smurfFile.tellg();
-        smurfFile.seekg(0, smurfFile.beg);
-        smurfCode = new char[length+1];
-        smurfFile.read(smurfCode, length);
-        smurfCode[length] = '\0';
-        smurfFile.close();
-    } else {
-        throw logic_error("Invalid file name");
-    }
+//    smurfFile.open(argv[1]);
+//    char* smurfCode;
+//    if (smurfFile) {
+//        smurfFile.seekg(0, smurfFile.end);
+//        int length = smurfFile.tellg();
+//        smurfFile.seekg(0, smurfFile.beg);
+//        smurfCode = new char[length+1];
+//        smurfFile.read(smurfCode, length);
+//        smurfCode[length] = '\0';
+//        smurfFile.close();
+//    } else {
+//        throw logic_error("Invalid file name");
+//    }
 
     parser parser;
     if(!parser.load_grammar(grammar_t)) {
@@ -185,18 +213,30 @@ int main(int argc, const char** argv) {
     parser.log = [](size_t line, size_t col, const string& msg) {
         cerr << line << ":" << col << ": " << msg << "\n";
     };
-    parser.enable_ast();
-    parser.enable_packrat_parsing();
 
-    shared_ptr<Ast> ast;
-    if(parser.parse(smurfCode, ast)) {
-        cout << ast_to_s(ast) << endl;
-        ast = AstOptimizer(true).optimize(ast);
-        cout << ast_to_s(ast) << endl;
-        cout << evaluate(*ast, binding) << endl;
+    setup_ast_generation(parser);
+
+    auto expr = argv[1];
+    ParseTreeNode val = ParseTreeNode();
+    if(parser.parse(expr, val)) {
+        cout << val.to_string() << " = " << val.get()->accept(new Interpreter()) << endl;
+        return 0;
     }
 
-    delete[] smurfCode;
+    cout << "syntax error!!!" << endl;
+    return -1;
+//    parser.enable_ast();
+//    parser.enable_packrat_parsing();
+
+//    shared_ptr<Ast> ast;
+//    if(parser.parse(smurfCode, ast)) {
+//        cout << ast_to_s(ast) << endl;
+//        ast = AstOptimizer(true).optimize(ast);
+//        cout << ast_to_s(ast) << endl;
+//        cout << evaluate(*ast, binding) << endl;
+//    }
+
+//    delete[] smurfCode;
 }
 
 int getVar(string ident, map<string, Value> &binding) {
@@ -385,4 +425,41 @@ int evaluate_funcCall(const Ast& ast, map<string, Value> &binding) {
             return toOutput;
         }
     }
+}
+
+
+AstNode *bin_op(const SemanticValues &sv) {
+    AstNode *left = sv[0].get<ParseTreeNode>().get();
+
+    for(unsigned int j = 0; j < sv.size(); j+=2) {
+        AstNode *right = sv[j+1].get<ParseTreeNode>().get();
+        string op = sv[j].get<ParseTreeNode>().get()->to_string();
+        left = new BinopNode(left, op, right);
+    }
+    return left;
+}
+
+void setup_ast_generation(parser &parser) {
+    parser["Statement"] = [](const SemanticValues &sv) {
+        cout << "expr: " << sv.str() << endl;
+        AstNode *n = bin_op(sv);
+        return ParseTreeNode(n);
+    };
+
+    parser["Mul_term"] = [](const SemanticValues &sv) {
+        AstNode *n = bin_op(sv);
+        return ParseTreeNode(n);
+    };
+
+    parser["Addop"] = [](const SemanticValues &sv) {
+        return ParseTreeNode(new OpNode(sv.str()));
+    };
+
+    parser["Mulop"] = [](const SemanticValues &sv) {
+        return ParseTreeNode(new OpNode(sv.str()));
+    };
+
+    parser["Int"] = [](const SemanticValues &sv) {
+        return ParseTreeNode(new IntegerNode(atoi(sv.c_str())));
+    };
 }

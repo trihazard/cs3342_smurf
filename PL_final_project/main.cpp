@@ -16,6 +16,39 @@ using namespace std;
 using namespace peg;
 
 
+auto grammar_t = R"(
+    # Grammar for Smurf
+    Program     <- Code
+    Comment     <- '#' (!End .)* &End
+    End         <-  EndOfLine / EndOfFile
+    EndOfLine   <-  '\r\n' / '\n' / '\r'
+    EndOfFile   <-  !.
+    Code        <- Statement*
+    Statement   <- 'let' Var_Dec / Assignment / Expr
+    Var_Dec     <- Dec (',' Dec)*
+    Dec         <- Ident ('=' Expr)?
+    Ident       <- < [a-z][a-zA-Z_0-9]* >
+    Var_ref     <- Ident
+    If_expr     <- Expr Braces ("else" Braces)?
+    Assignment  <- Ident '=' Expr
+    Expr        <- 'fn' Func_def / 'if' If_expr / Bool_expr / Arith_expr
+    Bool_expr   <- Arith_expr Relop Arith_expr
+    Arith_expr  <- Mul_term (Addop Mul_term)* / Mul_term
+    Mul_term    <- Primary (Mulop Primary)* / Primary
+    Primary     <- Int / Func_call / Var_ref / '(' Arith_expr ')'
+    Int         <- < '-'? [0-9]+ >
+    Addop       <- '+' / '-'
+    Mulop       <- '*' / '/'
+    Relop       <- '==' / '!=' / '>=' / '>' / '<=' / '<'
+    Func_call   <- Print_call '(' Call_args ')' / Var_ref '(' Call_args ')'
+    Print_call  <- 'print'
+    Call_args   <- (Expr (',' Expr)*)?
+    Func_def    <- Params Braces
+    Params      <- '(' Ident (',' Ident)* ')' / '(' ')'
+    Braces      <- '{' Code '}'
+    %whitespace <- ([ \t\r\n] / Comment)*
+)";
+
 struct Value {
     enum Type {Int, Function};
 
@@ -102,38 +135,7 @@ int evaluate_funcCall(const Ast& ast, Closure &scope);
 int main(int argc, const char** argv) {
     Closure scope;
     map<string, Value> binding;
-    auto grammar_t = R"(
-        # Grammar for Smurf
-        Program     <- Code
-        Comment     <- '#' (!End .)* &End
-        End         <-  EndOfLine / EndOfFile
-        EndOfLine   <-  '\r\n' / '\n' / '\r'
-        EndOfFile   <-  !.
-        Code        <- Statement*
-        Statement   <- 'let' Var_Dec / Assignment / Expr
-        Var_Dec     <- Dec (',' Dec)*
-        Dec         <- Ident ('=' Expr)?
-        Ident       <- < [a-z][a-zA-Z_0-9]* >
-        Var_ref     <- Ident
-        If_expr     <- Expr Braces ("else" Braces)?
-        Assignment  <- Ident '=' Expr
-        Expr        <- 'fn' Func_def / 'if' If_expr / Bool_expr / Arith_expr
-        Bool_expr   <- Arith_expr Relop Arith_expr
-        Arith_expr  <- Mul_term (Addop Mul_term)* / Mul_term
-        Mul_term    <- Primary (Mulop Primary)* / Primary
-        Primary     <- Int / Func_call / Var_ref / '(' Arith_expr ')'
-        Int         <- < '-'? [0-9]+ >
-        Addop       <- '+' / '-'
-        Mulop       <- '*' / '/'
-        Relop       <- '==' / '!=' / '>=' / '>' / '<=' / '<'
-        Func_call   <- Print_call '(' Call_args ')' / Var_ref '(' Call_args ')'
-        Print_call  <- 'print'
-        Call_args   <- (Expr (',' Expr)*)?
-        Func_def    <- Params Braces
-        Params      <- '(' Ident (',' Ident)* ')' / '(' ')'
-        Braces      <- '{' Code '}'
-        %whitespace <- ([ \t\r\n] / Comment)*
-    )";
+
     ifstream smurfFile;
     if(argc > 2)
         throw logic_error("Invalid number of inputs passed to program");
@@ -152,10 +154,10 @@ int main(int argc, const char** argv) {
         throw logic_error("Invalid file name");
     }
 
-    parser parser;
-    if(!parser.load_grammar(grammar_t)) {
-        throw logic_error("Invalid PEG grammar");
-    }
+    parser parser(grammar_t);
+//    if(!parser.load_grammar(grammar_t)) {
+//        throw logic_error("Invalid PEG grammar");
+//    }
 
     parser.log = [](size_t line, size_t col, const string& msg) {
         cerr << line << ":" << col << ": " << msg << "\n";
@@ -163,8 +165,11 @@ int main(int argc, const char** argv) {
     parser.enable_ast();
     parser.enable_packrat_parsing();
 
+    cout << "at AST" << endl;
     shared_ptr<Ast> ast;
     if(parser.parse(smurfCode, ast)) {
+        //WHY WONT IT GET HERE
+        cout << "Started parsing" << endl;
 //        cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
 //        cout << ast_to_s(ast) << endl;

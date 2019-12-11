@@ -2,15 +2,7 @@
  *
  * Add comments to stuff to make it more legible
  *
- * Finish structs needed for closure and functions
- * RECHECK EVERYTHING BECAUSE I WAS ASLEEP WHILE WRITING THEM
- *
- * Do I want an evaluate function defined for Value struct?
- *  - YES I DO - means I don't have to check the actual variable's type in my parsing logic
- *
- * Function calls in general
- * Function calls during arithmetic/Mult expressions
- *
+ * Comments left on master-closures branch detail why I couldn't get closures to work
  */
 
 #include <iostream>
@@ -28,7 +20,7 @@ struct Value {
     enum Type {Int, Function};
 
     explicit Value(int val = 0): type(Int), value(val) {}
-    //This constructor may need to change
+    //This constructor was changed to attempt closures on master-closures branch, but it failed
     explicit Value(Ast& ast): type(Function), value(ast) {}
 
     Value& operator=(const Value& rhs) {
@@ -42,18 +34,6 @@ struct Value {
         value = rhs;
         return *this;
     }
-
-//    int evaluate() {
-//        switch (this->type) {
-//            case Int:
-//                return this->value.get<int>();
-
-//            case Function:
-//                //TODO DFLSKFSDKJFL
-//                break;
-//        }
-//        throw logic_error("Something went wrong while evaluating a variable");
-//    }
 
     Type type;
     peg::any value;
@@ -96,7 +76,6 @@ struct Closure {
     void assign(string s, Value value) {
       if (binding.find(s) != binding.end()) {
         Value& thing = binding[s];
-//        thing.value = value.evaluate();
         thing.value = value.value.get<int>();
         return;
       }
@@ -390,7 +369,6 @@ int evaluate_funcCall(const Ast& ast, Closure &scope) {
         }
     } else {
         auto functionNode = scope.get(funcCall[0]->token).value.get<Ast>();
-//        if(funcCall[1]->nodes.size() == functionNode.nodes[0]->nodes.size()) {
             Closure innerClosure;
             innerClosure.linkParent(make_shared<Closure>(scope));
             int param;
@@ -407,9 +385,5 @@ int evaluate_funcCall(const Ast& ast, Closure &scope) {
             }
             int functionResult = evaluate(*functionNode.nodes[1], innerClosure);
             return functionResult;
-//        } else {
-//            throw logic_error("Function call had mismatching number of arguments: " + funcCall[0]->token);
-//        }
-        throw logic_error("NOT DONE");
     }
 }

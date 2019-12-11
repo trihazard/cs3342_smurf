@@ -168,7 +168,7 @@ int main(int argc, const char** argv) {
 //        cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
 //        cout << ast_to_s(ast) << endl;
-        cout << evaluate(*ast, scope) << endl;
+        evaluate(*ast, scope);
     }
 
     delete[] smurfCode;

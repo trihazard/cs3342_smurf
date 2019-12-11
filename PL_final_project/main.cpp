@@ -43,16 +43,17 @@ struct Value {
         return *this;
     }
 
-    int evaluate() {
-        switch (this->type) {
-            case Int:
-                return this->value.get<int>();
+//    int evaluate() {
+//        switch (this->type) {
+//            case Int:
+//                return this->value.get<int>();
 
-            case Function:
-                //TODO DFLSKFSDKJFL
-                break;
-        }
-    }
+//            case Function:
+//                //TODO DFLSKFSDKJFL
+//                break;
+//        }
+//        throw logic_error("Something went wrong while evaluating a variable");
+//    }
 
     Type type;
     peg::any value;
@@ -86,16 +87,17 @@ struct Closure {
     }
 
     void declare(string s, Value value) {
-        if(binding.find(s) == binding.end())
+//        if(binding.find(s) == binding.end()) Test cases use the "Let" keyword multiple times for the same variable so I took out this error handling
             binding[s] = value;
-        else
-            throw runtime_error("Variable '" + s + "' already defined");
+//        else
+//            throw runtime_error("Variable '" + s + "' already defined");
     }
 
-    void assign(string& s, Value& value) {
+    void assign(string s, Value value) {
       if (binding.find(s) != binding.end()) {
         Value& thing = binding[s];
-        thing.value = value;
+//        thing.value = value.evaluate();
+        thing.value = value.value.get<int>();
         return;
       }
       parent->assign(s, value);
@@ -107,22 +109,16 @@ struct Closure {
     int level;
 };
 
-int getVar(string ident, map<string, Value> &binding);
-int evaluate(const Ast& ast, map<string, Value> &binding);
-int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding);
-int evaluate_mulTerms(const Ast& ast, map<string, Value> &binding);
-int evaluate_varDec(const Ast& ast, map<string, Value> &binding);
-int evaluate_Dec(const Ast& ast, map<string, Value> &binding);
-int evaluate_assignment(const Ast& ast, map<string, Value> &binding);
-int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding);
-int evaluate_ifExpr(const Ast& ast, map<string, Value> &binding);
-int evaluate_funcCall(const Ast& ast, map<string, Value> &binding);
-
-Ast visit_arithmetic_expression(Ast& ast);
-Ast visit_mult_term(Ast& ast);
-Ast visit_integer(Ast& ast);
-
-
+int getVar(string ident, Closure &scope);
+int evaluate(const Ast& ast, Closure &scope);
+int evaluate_arithmeticTerms(const Ast& ast, Closure &scope);
+int evaluate_mulTerms(const Ast& ast, Closure &scope);
+int evaluate_varDec(const Ast& ast, Closure &scope);
+int evaluate_Dec(const Ast& ast, Closure &scope);
+int evaluate_assignment(const Ast& ast, Closure &scope);
+int evaluate_boolExpr(const Ast& ast, Closure &scope);
+int evaluate_ifExpr(const Ast& ast, Closure &scope);
+int evaluate_funcCall(const Ast& ast, Closure &scope);
 
 int main(int argc, const char** argv) {
     Closure scope;
@@ -190,66 +186,67 @@ int main(int argc, const char** argv) {
 
     shared_ptr<Ast> ast;
     if(parser.parse(smurfCode, ast)) {
-        cout << ast_to_s(ast) << endl;
+//        cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
-        cout << ast_to_s(ast) << endl;
-        cout << evaluate(*ast, binding) << endl;
+//        cout << ast_to_s(ast) << endl;
+        cout << evaluate(*ast, scope) << endl;
     }
 
     delete[] smurfCode;
 }
 
-int getVar(string ident, map<string, Value> &binding) {
-    auto iter = binding.find(ident);
-    if(iter != binding.end()) {
-        return iter->second.evaluate();
+int getVar(string ident, Closure &scope) {
+    auto has = scope.contains(ident);
+    if(has) {
+//        return scope.get(ident).evaluate();
+        return scope.get(ident).value.get<int>();
     } else {
         throw runtime_error("Variable " + ident + "has not been defined");
     }
 }
 
-int evaluate(const Ast& ast, map<string, Value> &binding) {
+int evaluate(const Ast& ast, Closure &scope) {
     int result = 0;
     if(ast.name == "Int") {
         return stol(ast.token);
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, binding);
+        return getVar(ast.token, scope);
     } else if(ast.name == "Arith_expr") {
-        return evaluate_arithmeticTerms(ast, binding);
+        return evaluate_arithmeticTerms(ast, scope);
     } else if(ast.name == "Mul_term") {
-        return evaluate_mulTerms(ast, binding);
+        return evaluate_mulTerms(ast, scope);
     } else if(ast.name == "Var_Dec") {
-        return evaluate_varDec(ast, binding);
+        return evaluate_varDec(ast, scope);
     } else if(ast.name == "Dec") {
-        return evaluate_Dec(ast, binding);
+        return evaluate_Dec(ast, scope);
     } else if(ast.name == "Assignment") {
-        return evaluate_assignment(ast, binding);
+        return evaluate_assignment(ast, scope);
     } else if(ast.name == "Bool_expr") {
-        return evaluate_boolExpr(ast, binding);
+        return evaluate_boolExpr(ast, scope);
     } else if(ast.name == "If_expr") {
-        return evaluate_ifExpr(ast, binding);
+        return evaluate_ifExpr(ast, scope);
     } else if(ast.name == "Func_call") {
-        return evaluate_funcCall(ast, binding);
+        return evaluate_funcCall(ast, scope);
     } else {
         const auto& subAst = ast.nodes;
         for(unsigned int j = 0; j < subAst.size(); j++) {
-            result = evaluate(*subAst[j], binding);
+            result = evaluate(*subAst[j], scope);
         }
     }
     return result;
 }
 
-int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding) {
+int evaluate_arithmeticTerms(const Ast& ast, Closure &scope) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, binding);
+        return getVar(ast.token, scope);
     } else {
         const auto& subAst = ast.nodes;
-        result = evaluate(*subAst[0], binding);
+        result = evaluate(*subAst[0], scope);
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
-            auto rightSide = evaluate(*subAst[j+1], binding);
+            auto rightSide = evaluate(*subAst[j+1], scope);
             auto operation = subAst[j]->token;
             if(operation == "+")
                 result += rightSide;
@@ -261,17 +258,17 @@ int evaluate_arithmeticTerms(const Ast& ast, map<string, Value> &binding) {
     return result;
 }
 
-int evaluate_mulTerms(const Ast& ast, map<string, Value> &binding) {
+int evaluate_mulTerms(const Ast& ast, Closure &scope) {
     int result;
     if(ast.name == "Int") {
         return stol(ast.token);
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, binding);
+        return getVar(ast.token, scope);
     } else {
         const auto& subAst = ast.nodes;
-        result = evaluate(*subAst[0], binding);
+        result = evaluate(*subAst[0], scope);
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
-            auto rightSide = evaluate(*subAst[j+1], binding);
+            auto rightSide = evaluate(*subAst[j+1], scope);
             auto operation = subAst[j]->token;
             if(operation == "*")
                 result *= rightSide;
@@ -282,58 +279,65 @@ int evaluate_mulTerms(const Ast& ast, map<string, Value> &binding) {
     return result;
 }
 
-int evaluate_varDec(const Ast& ast, map<string, Value> &binding) {
+int evaluate_varDec(const Ast& ast, Closure &scope) {
     const auto varsToDeclare = ast.nodes;
     int result = 0;
     for(unsigned int j = 0; j < varsToDeclare.size(); j++) {
-        result = evaluate_Dec(*varsToDeclare[j], binding);
+        result = evaluate_Dec(*varsToDeclare[j], scope);
     }
     return result;
 }
 
-int evaluate_Dec(const Ast& ast, map<string, Value> &binding) {
-    auto iter = binding.find(ast.nodes[0]->token);
-    if(iter == binding.end()) {
+int evaluate_Dec(const Ast& ast, Closure &scope) {
+    //auto iter = binding.find(ast.nodes[0]->token);
+//    auto has = scope.contains(ast.nodes[0]->token); Test cases have redefined variables so I got rid of this check
+//    if(!has) {
         if(ast.nodes[1]->name == "Func_def") {
             auto value = Value(*ast.nodes[1]);
-            binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            //binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            scope.declare(ast.nodes[0]->token, value);
             return 1;
         } else {
-            auto almostValue = evaluate(*ast.nodes[1], binding);
+            auto almostValue = evaluate(*ast.nodes[1], scope);
             auto value = Value(almostValue);
-            binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            //binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
+            scope.declare(ast.nodes[0]->token, value);
             return almostValue;
         }
 
         //binding.insert(pair<string,int>(ast.nodes[0]->token, value));
-    } else {
-        throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
-    }
+//    } else {
+//        throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
+//    }
 }
 
-int evaluate_assignment(const Ast& ast, map<string, Value> &binding) {
-    auto iter = binding.find(ast.nodes[0]->token);
-    if(iter != binding.end()) {
+int evaluate_assignment(const Ast& ast, Closure &scope) {
+    //auto iter = binding.find(ast.nodes[0]->token);
+    auto has = scope.contains(ast.nodes[0]->token);
+    if(has) {
         if(ast.nodes[1]->name == "Func_def") {
             auto value = Value(*ast.nodes[1]);
-            iter->second = value;
+            //iter->second = value;
+            scope.assign(ast.nodes[0]->token, value);
             return 1;
         } else {
-            int value = evaluate(*ast.nodes[1], binding);
-            iter->second = value;
-            return value;
+            auto value = Value(evaluate(*ast.nodes[1], scope));
+            //iter->second = value;
+            scope.assign(ast.nodes[0]->token, value);
+//            return value.evaluate();
+            return value.value.get<int>();
         }
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
     }
 }
 
-int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding) {
+int evaluate_boolExpr(const Ast& ast, Closure &scope) {
     //'==' / '!=' / '>=' / '>' / '<=' / '<'
     int eval = 0;
     const auto fullExpr = ast.nodes;
-    int leftSide = evaluate_arithmeticTerms(*fullExpr[0], binding);
-    int rightSide = evaluate_arithmeticTerms(*fullExpr[2], binding);
+    int leftSide = evaluate_arithmeticTerms(*fullExpr[0], scope);
+    int rightSide = evaluate_arithmeticTerms(*fullExpr[2], scope);
     auto operation = fullExpr[1]->token;
     if(operation == "==") {
         eval = int(leftSide == rightSide);
@@ -352,37 +356,60 @@ int evaluate_boolExpr(const Ast& ast, map<string, Value> &binding) {
     return eval;
 }
 
-int evaluate_ifExpr(const Ast& ast, map<string, Value> &binding) {
+int evaluate_ifExpr(const Ast& ast, Closure &scope) {
     const auto nodes = ast.nodes;
-    int pretendBool = evaluate(*nodes[0], binding);
+    int pretendBool = evaluate(*nodes[0], scope);
 
     if(pretendBool != 0)
-        return evaluate(*nodes[1], binding);
+        return evaluate(*nodes[1], scope);
 
     if(nodes.size() == 3)
-        return evaluate(*nodes[2], binding);
+        return evaluate(*nodes[2], scope);
 
     return pretendBool;
 }
 
-int evaluate_funcCall(const Ast& ast, map<string, Value> &binding) {
-    const auto func = ast.nodes;
+int evaluate_funcCall(const Ast& ast, Closure &scope) {
+    const auto funcCall = ast.nodes;
     int toOutput = 0;
-    if(func[0]->name == "Print_call") {
-        if(func[1]->name == "Call_args") {
-                cout << "Print: ";
-            for(unsigned int j = 0; j < func[1]->nodes.size(); j++) {
-                toOutput = evaluate(*func[1]->nodes[j], binding);
+    if(funcCall[0]->name == "Print_call") {
+        cout << "Print: ";
+        if(funcCall[1]->name == "Call_args") {
+            for(unsigned int j = 0; j < funcCall[1]->nodes.size(); j++) {
+                toOutput = evaluate(*funcCall[1]->nodes[j], scope);
                 cout << toOutput;
-                if(j < func[1]->nodes.size()-1)
+                if(j < funcCall[1]->nodes.size()-1)
                     cout << "|";
             }
             cout << endl;
             return toOutput;
         } else {
-            toOutput = evaluate(*func[1], binding);
-            cout << "Print: " << toOutput << endl;
+            toOutput = evaluate(*funcCall[1], scope);
+            cout << toOutput << endl;
             return toOutput;
         }
+    } else {
+        auto functionNode = scope.get(funcCall[0]->token).value.get<Ast>();
+//        if(funcCall[1]->nodes.size() == functionNode.nodes[0]->nodes.size()) {
+            Closure innerClosure;
+            innerClosure.linkParent(make_shared<Closure>(scope));
+            int param;
+            if(funcCall[1]->name != "Call_args") {
+                param = evaluate(*funcCall[1], innerClosure);
+                auto val = Value(param);
+                innerClosure.declare(functionNode.nodes[0]->token, val);
+            } else {
+                for(unsigned int j = 0; j < funcCall[1]->nodes.size(); j++) {
+                    param = evaluate(*funcCall[1]->nodes[j], innerClosure);
+                    auto val = Value(param);
+                    innerClosure.declare(functionNode.nodes[0]->nodes[j]->token, val);
+                }
+            }
+            int functionResult = evaluate(*functionNode.nodes[1], innerClosure);
+            return functionResult;
+//        } else {
+//            throw logic_error("Function call had mismatching number of arguments: " + funcCall[0]->token);
+//        }
+        throw logic_error("NOT DONE");
     }
 }

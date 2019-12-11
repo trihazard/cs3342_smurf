@@ -1,15 +1,10 @@
-/* TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!KLKLJKJ!!!!!!!!!!!!!!
+/* TODO/Problems: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!KLKLJKJ!!!!!!!!!!!!!!
  *
  * Add comments to stuff to make it more legible
  *
- * Finish structs needed for closure and functions
- * RECHECK EVERYTHING BECAUSE I WAS ASLEEP WHILE WRITING THEM
  *
- * Do I want an evaluate function defined for Value struct?
- *  - YES I DO - means I don't have to check the actual variable's type in my parsing logic
- *
- * Function calls in general
- * Function calls during arithmetic/Mult expressions
+ * Closures don't work; when I run add_n(2) and it evaluates the inner function
+ * my current scope is getting deleted somehow, don't know how to fix
  *
  */
 
@@ -19,17 +14,29 @@
 #include <assert.h>
 #include <string>
 #include <map>
+#include <vector>
 
 using namespace std;
 using namespace peg;
 
+
+struct Value;
+struct Closure;
+struct Function;
+
+struct FunctionObject {
+    FunctionObject(Ast& function, Closure* localC) : localClosure(localC), value(function){}
+
+    Closure* localClosure;
+    Ast value;
+};
 
 struct Value {
     enum Type {Int, Function};
 
     explicit Value(int val = 0): type(Int), value(val) {}
     //This constructor may need to change
-    explicit Value(Ast& ast): type(Function), value(ast) {}
+    explicit Value(Ast& currAst, Closure* localC): type(Function), value(FunctionObject(currAst, localC)) {}
 
     Value& operator=(const Value& rhs) {
       type = rhs.type;
@@ -43,17 +50,145 @@ struct Value {
         return *this;
     }
 
-//    int evaluate() {
-//        switch (this->type) {
-//            case Int:
-//                return this->value.get<int>();
+    Value& operator+=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to add different variable types");
+        switch (this->type) {
+            case Int:
+            this->value = this->value.get<int>() + rhs.value.get<int>();
+            break;
 
-//            case Function:
-//                //TODO DFLSKFSDKJFL
-//                break;
-//        }
-//        throw logic_error("Something went wrong while evaluating a variable");
-//    }
+            case Function:
+            throw logic_error("You tried to add function declarations");
+        }
+        return *this;
+    }
+
+    Value& operator-=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to subtract different variable types");
+        switch (this->type) {
+            case Int:
+            this->value = this->value.get<int>() - rhs.value.get<int>();
+            break;
+
+            case Function:
+            throw logic_error("You tried to subtract function declarations");
+        }
+        return *this;
+    }
+
+    Value& operator*=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to multiply different variable types");
+        switch (this->type) {
+            case Int:
+            this->value = this->value.get<int>() * rhs.value.get<int>();
+            break;
+
+            case Function:
+            throw logic_error("You tried to multiply function declarations");
+        }
+        return *this;
+    }
+
+    Value& operator/=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to divide different variable types");
+        switch (this->type) {
+            case Int:
+            this->value = this->value.get<int>() / rhs.value.get<int>();
+            break;
+
+            case Function:
+            throw logic_error("You tried to divide function declarations");
+        }
+        return *this;
+    }
+
+    bool operator==(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() == rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    bool operator!=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() != rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    bool operator<=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() <= rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    bool operator>=(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() >= rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    bool operator<(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() < rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    bool operator>(const Value& rhs) {
+        if(this->type != rhs.type)
+            throw logic_error("You tried to compare different variable types");
+        switch (this->type) {
+            case Int:
+            return (this->value.get<int>() > rhs.value.get<int>());
+
+            case Function:
+            throw logic_error("You tried to compare function declarations");
+        }
+    }
+
+    friend ostream& operator<<(ostream &output, const Value rhs) {
+        switch (rhs.type) {
+            case Int:
+            output << rhs.value.get<int>();
+            return output;
+
+            case Function:
+            output << "This is a function of type: " << rhs.value.get<FunctionObject>().value.name;
+            return output;
+        }
+    }
 
     Type type;
     peg::any value;
@@ -96,7 +231,6 @@ struct Closure {
     void assign(string s, Value value) {
       if (binding.find(s) != binding.end()) {
         Value& thing = binding[s];
-//        thing.value = value.evaluate();
         thing.value = value.value.get<int>();
         return;
       }
@@ -109,20 +243,23 @@ struct Closure {
     int level;
 };
 
-int getVar(string ident, Closure &scope);
-int evaluate(const Ast& ast, Closure &scope);
-int evaluate_arithmeticTerms(const Ast& ast, Closure &scope);
-int evaluate_mulTerms(const Ast& ast, Closure &scope);
-int evaluate_varDec(const Ast& ast, Closure &scope);
-int evaluate_Dec(const Ast& ast, Closure &scope);
-int evaluate_assignment(const Ast& ast, Closure &scope);
-int evaluate_boolExpr(const Ast& ast, Closure &scope);
-int evaluate_ifExpr(const Ast& ast, Closure &scope);
-int evaluate_funcCall(const Ast& ast, Closure &scope);
+Value getVar(string ident, Closure &scope);
+Value evaluate(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_arithmeticTerms(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_mulTerms(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_varDec(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_Dec(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_assignment(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_boolExpr(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_ifExpr(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_funcCall(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
+Value evaluate_funcDef(Ast& ast, vector<Closure> &closureCollection, Closure* currScope);
 
 int main(int argc, const char** argv) {
-    Closure scope;
-    map<string, Value> binding;
+    vector<Closure> closureCollection;
+    Closure baseScope;
+    closureCollection.push_back(baseScope);
+    Closure* currClosure = &closureCollection[0];
     auto grammar_t = R"(
         # Grammar for Smurf
         Program     <- Code
@@ -188,65 +325,68 @@ int main(int argc, const char** argv) {
     if(parser.parse(smurfCode, ast)) {
 //        cout << ast_to_s(ast) << endl;
         ast = AstOptimizer(true).optimize(ast);
-//        cout << ast_to_s(ast) << endl;
-        cout << evaluate(*ast, scope) << endl;
+        cout << ast_to_s(ast) << endl;
+        cout << evaluate(*ast, closureCollection, currClosure) << endl;
     }
 
     delete[] smurfCode;
 }
 
-int getVar(string ident, Closure &scope) {
+Value getVar(string ident, Closure &scope) {
     auto has = scope.contains(ident);
     if(has) {
-//        return scope.get(ident).evaluate();
-        return scope.get(ident).value.get<int>();
+        return Value(scope.get(ident).value.get<int>());
     } else {
         throw runtime_error("Variable " + ident + "has not been defined");
     }
 }
 
-int evaluate(const Ast& ast, Closure &scope) {
-    int result = 0;
+Value evaluate(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
+    Value result;
     if(ast.name == "Int") {
-        return stol(ast.token);
+        result = stol(ast.token);
+        return Value(result);
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, scope);
+        return getVar(ast.token, *currScope);
     } else if(ast.name == "Arith_expr") {
-        return evaluate_arithmeticTerms(ast, scope);
+        return evaluate_arithmeticTerms(ast, closureCollection, currScope);
     } else if(ast.name == "Mul_term") {
-        return evaluate_mulTerms(ast, scope);
+        return evaluate_mulTerms(ast, closureCollection, currScope);
     } else if(ast.name == "Var_Dec") {
-        return evaluate_varDec(ast, scope);
+        return evaluate_varDec(ast, closureCollection, currScope);
     } else if(ast.name == "Dec") {
-        return evaluate_Dec(ast, scope);
+        return evaluate_Dec(ast, closureCollection, currScope);
     } else if(ast.name == "Assignment") {
-        return evaluate_assignment(ast, scope);
+        return evaluate_assignment(ast, closureCollection, currScope);
     } else if(ast.name == "Bool_expr") {
-        return evaluate_boolExpr(ast, scope);
+        return evaluate_boolExpr(ast, closureCollection, currScope);
     } else if(ast.name == "If_expr") {
-        return evaluate_ifExpr(ast, scope);
+        return evaluate_ifExpr(ast, closureCollection, currScope);
     } else if(ast.name == "Func_call") {
-        return evaluate_funcCall(ast, scope);
+        return evaluate_funcCall(ast, closureCollection, currScope);
+    } else if(ast.name == "Func_def") {
+        return evaluate_funcDef(ast, closureCollection, currScope);
     } else {
         const auto& subAst = ast.nodes;
         for(unsigned int j = 0; j < subAst.size(); j++) {
-            result = evaluate(*subAst[j], scope);
+            result = evaluate(*subAst[j], closureCollection, currScope);
+//            cout << "Finished " << j << endl;
         }
     }
     return result;
 }
 
-int evaluate_arithmeticTerms(const Ast& ast, Closure &scope) {
-    int result;
+Value evaluate_arithmeticTerms(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
+    Value result;
     if(ast.name == "Int") {
-        return stol(ast.token);
+        return Value(stol(ast.token));
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, scope);
+        return getVar(ast.token, *currScope);
     } else {
         const auto& subAst = ast.nodes;
-        result = evaluate(*subAst[0], scope);
+        result = evaluate(*subAst[0], closureCollection, currScope);
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
-            auto rightSide = evaluate(*subAst[j+1], scope);
+            auto rightSide = evaluate(*subAst[j+1], closureCollection, currScope);
             auto operation = subAst[j]->token;
             if(operation == "+")
                 result += rightSide;
@@ -258,17 +398,17 @@ int evaluate_arithmeticTerms(const Ast& ast, Closure &scope) {
     return result;
 }
 
-int evaluate_mulTerms(const Ast& ast, Closure &scope) {
-    int result;
+Value evaluate_mulTerms(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
+    Value result;
     if(ast.name == "Int") {
-        return stol(ast.token);
+        return Value(stol(ast.token));
     } else if(ast.name == "Ident") {
-        return getVar(ast.token, scope);
+        return getVar(ast.token, *currScope);
     } else {
         const auto& subAst = ast.nodes;
-        result = evaluate(*subAst[0], scope);
+        result = evaluate(*subAst[0], closureCollection, currScope);
         for(unsigned int j = 1; j<subAst.size(); j+=2) {
-            auto rightSide = evaluate(*subAst[j+1], scope);
+            auto rightSide = evaluate(*subAst[j+1], closureCollection, currScope);
             auto operation = subAst[j]->token;
             if(operation == "*")
                 result *= rightSide;
@@ -279,65 +419,57 @@ int evaluate_mulTerms(const Ast& ast, Closure &scope) {
     return result;
 }
 
-int evaluate_varDec(const Ast& ast, Closure &scope) {
+Value evaluate_varDec(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
     const auto varsToDeclare = ast.nodes;
-    int result = 0;
+    Value result;
     for(unsigned int j = 0; j < varsToDeclare.size(); j++) {
-        result = evaluate_Dec(*varsToDeclare[j], scope);
+        result = evaluate_Dec(*varsToDeclare[j], closureCollection, currScope);
     }
     return result;
 }
 
-int evaluate_Dec(const Ast& ast, Closure &scope) {
-    //auto iter = binding.find(ast.nodes[0]->token);
-//    auto has = scope.contains(ast.nodes[0]->token); Test cases have redefined variables so I got rid of this check
-//    if(!has) {
+Value evaluate_Dec(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
         if(ast.nodes[1]->name == "Func_def") {
-            auto value = Value(*ast.nodes[1]);
+            auto value = Value(*ast.nodes[1], currScope);
             //binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
-            scope.declare(ast.nodes[0]->token, value);
-            return 1;
+            currScope->declare(ast.nodes[0]->token, value);
+            return value;
         } else {
-            auto almostValue = evaluate(*ast.nodes[1], scope);
-            auto value = Value(almostValue);
+            auto value = evaluate(*ast.nodes[1], closureCollection, currScope);
+            //auto value = Value(almostValue);
             //binding.insert(pair<string, Value>(ast.nodes[0]->token, value));
-            scope.declare(ast.nodes[0]->token, value);
-            return almostValue;
+            currScope->declare(ast.nodes[0]->token, value);
+            return value;
         }
-
-        //binding.insert(pair<string,int>(ast.nodes[0]->token, value));
-//    } else {
-//        throw runtime_error("Variable " + ast.nodes[0]->token + "already defined");
-//    }
 }
 
-int evaluate_assignment(const Ast& ast, Closure &scope) {
+Value evaluate_assignment(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
     //auto iter = binding.find(ast.nodes[0]->token);
-    auto has = scope.contains(ast.nodes[0]->token);
+    auto has = currScope->contains(ast.nodes[0]->token);
     if(has) {
         if(ast.nodes[1]->name == "Func_def") {
-            auto value = Value(*ast.nodes[1]);
+            auto value = Value(*ast.nodes[1], currScope);
             //iter->second = value;
-            scope.assign(ast.nodes[0]->token, value);
-            return 1;
+            currScope->assign(ast.nodes[0]->token, value);
+            return value;
         } else {
-            auto value = Value(evaluate(*ast.nodes[1], scope));
+            auto value = evaluate(*ast.nodes[1], closureCollection, currScope);
             //iter->second = value;
-            scope.assign(ast.nodes[0]->token, value);
+            currScope->assign(ast.nodes[0]->token, value);
 //            return value.evaluate();
-            return value.value.get<int>();
+            return value;
         }
     } else {
         throw runtime_error("Variable " + ast.nodes[0]->token + " is not defined");
     }
 }
 
-int evaluate_boolExpr(const Ast& ast, Closure &scope) {
+Value evaluate_boolExpr(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
     //'==' / '!=' / '>=' / '>' / '<=' / '<'
     int eval = 0;
     const auto fullExpr = ast.nodes;
-    int leftSide = evaluate_arithmeticTerms(*fullExpr[0], scope);
-    int rightSide = evaluate_arithmeticTerms(*fullExpr[2], scope);
+    Value leftSide = evaluate_arithmeticTerms(*fullExpr[0], closureCollection, currScope);
+    Value rightSide = evaluate_arithmeticTerms(*fullExpr[2], closureCollection, currScope);
     auto operation = fullExpr[1]->token;
     if(operation == "==") {
         eval = int(leftSide == rightSide);
@@ -353,30 +485,30 @@ int evaluate_boolExpr(const Ast& ast, Closure &scope) {
         //it is guaranteed that the operator is '<' if it gets here, since the operator definition is a terminal
         eval = int(leftSide < rightSide);
     }
-    return eval;
+    return Value(eval);
 }
 
-int evaluate_ifExpr(const Ast& ast, Closure &scope) {
+Value evaluate_ifExpr(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
     const auto nodes = ast.nodes;
-    int pretendBool = evaluate(*nodes[0], scope);
+    Value pretendBool = evaluate(*nodes[0], closureCollection, currScope);
 
-    if(pretendBool != 0)
-        return evaluate(*nodes[1], scope);
+    if(pretendBool != Value())
+        return evaluate(*nodes[1], closureCollection, currScope);
 
     if(nodes.size() == 3)
-        return evaluate(*nodes[2], scope);
+        return evaluate(*nodes[2], closureCollection, currScope);
 
     return pretendBool;
 }
 
-int evaluate_funcCall(const Ast& ast, Closure &scope) {
+Value evaluate_funcCall(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
     const auto funcCall = ast.nodes;
-    int toOutput = 0;
+    Value toOutput;
     if(funcCall[0]->name == "Print_call") {
         cout << "Print: ";
         if(funcCall[1]->name == "Call_args") {
             for(unsigned int j = 0; j < funcCall[1]->nodes.size(); j++) {
-                toOutput = evaluate(*funcCall[1]->nodes[j], scope);
+                toOutput = evaluate(*funcCall[1]->nodes[j], closureCollection, currScope);
                 cout << toOutput;
                 if(j < funcCall[1]->nodes.size()-1)
                     cout << "|";
@@ -384,32 +516,36 @@ int evaluate_funcCall(const Ast& ast, Closure &scope) {
             cout << endl;
             return toOutput;
         } else {
-            toOutput = evaluate(*funcCall[1], scope);
+            toOutput = evaluate(*funcCall[1], closureCollection, currScope);
             cout << toOutput << endl;
             return toOutput;
         }
     } else {
-        auto functionNode = scope.get(funcCall[0]->token).value.get<Ast>();
-//        if(funcCall[1]->nodes.size() == functionNode.nodes[0]->nodes.size()) {
-            Closure innerClosure;
-            innerClosure.linkParent(make_shared<Closure>(scope));
-            int param;
-            if(funcCall[1]->name != "Call_args") {
-                param = evaluate(*funcCall[1], innerClosure);
-                auto val = Value(param);
-                innerClosure.declare(functionNode.nodes[0]->token, val);
-            } else {
-                for(unsigned int j = 0; j < funcCall[1]->nodes.size(); j++) {
-                    param = evaluate(*funcCall[1]->nodes[j], innerClosure);
-                    auto val = Value(param);
-                    innerClosure.declare(functionNode.nodes[0]->nodes[j]->token, val);
-                }
+        auto f = currScope->get(funcCall[0]->token).value.get<FunctionObject>();
+        auto functionNode = f.value;
+        auto funcScope = f.localClosure;
+        Closure innerClosure;
+        innerClosure.linkParent(make_shared<Closure>(*funcScope));
+        Value param;
+        if(funcCall[1]->name != "Call_args") {
+//             try {
+//                 param = evaluate(*funcCall[1], closureCollection, &innerClosure);
+//             } catch (logic_error) {
+                   param = evaluate(*funcCall[1], closureCollection, currScope);
+//             }
+               innerClosure.declare(functionNode.nodes[0]->token, param);
+        } else {
+            for(unsigned int j = 0; j < funcCall[1]->nodes.size(); j++) {
+                param = evaluate(*funcCall[1]->nodes[j], closureCollection, &innerClosure);
+                innerClosure.declare(functionNode.nodes[0]->nodes[j]->token, param);
             }
-            int functionResult = evaluate(*functionNode.nodes[1], innerClosure);
-            return functionResult;
-//        } else {
-//            throw logic_error("Function call had mismatching number of arguments: " + funcCall[0]->token);
-//        }
-        throw logic_error("NOT DONE");
+        }
+        Value functionResult = evaluate(*functionNode.nodes[1], closureCollection, &innerClosure);
+        return functionResult;
     }
+}
+
+Value evaluate_funcDef(Ast& ast, vector<Closure> &closureCollection, Closure* currScope) {
+    closureCollection.push_back(*currScope);
+    return Value(ast, &closureCollection[closureCollection.size()-1]);
 }

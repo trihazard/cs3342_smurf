@@ -17,13 +17,13 @@ it would be blue).
 
 **Fill this in before submitting your final pull request**
 
-Name:
+Name: Nathan Srirama
 
-SMU ID:
+SMU ID: 47422808
 
 ##### Grading criteria (see [Grading](#grading) below):
 
-[ ] test-based
+[X] test-based
 
 [ ] feature based
 
@@ -40,12 +40,12 @@ If feature based, put an X in the cell that represents the combination of syntax
 
 I've included in this PR:
 
-[ ] everything I'll need to build a running version of your submission (source,
+[X] everything I'll need to build a running version of your submission (source,
     dependency loading, etc)
 
-[ ] a build file that will create an executable (if required)
+[X] a build file that will create an executable (if required)
 
-[ ] a script that will run the tests (if you're making a test-based submission)
+[X] a script that will run the tests (if you're making a test-based submission)
 
 (see [Deliverables](#deliverables) for more details)
 

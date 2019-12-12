@@ -145,6 +145,14 @@ void setup_ast_generation(parser &parser)
         return ParseTreeNode(n);
     };
 
+//      won't work since assignment only takes one sv parameter, how can I make a mini sv object with just the indeces I want?
+//    parser["Var_Dec"] = [](const SemanticValues &sv) {
+//        AstNode *n = nullptr;
+//        for(unsigned int j = 0; j < sv.size(); j++) {
+//            n = assignment(sv[j].get<SemanticValues>());
+//        }
+//    };
+
     parser["Dec"] = [](const SemanticValues &sv) {
         AstNode *n = assignment(sv);
         return ParseTreeNode(n);
@@ -168,6 +176,8 @@ void setup_ast_generation(parser &parser)
         return ParseTreeNode(new IdentNode(sv.str()));
     };
 
+    //I actually think this should be a different type of node, and then this one
+    //handles retrieving variables, while Ident is strictly naming. I think
     parser["Var_ref"] = [](const SemanticValues &sv) {
         return ParseTreeNode(new IdentNode(sv.str()));
     };

@@ -13,7 +13,7 @@ public:
     virtual int evaluate_binop(AstNode* node, AstNode* left, string op, AstNode* right) {return 0;}
     virtual int evaluate_varDec(AstNode* node, AstNode* left, string op, AstNode* right){return 0;}
     virtual int evaluate_assignment(AstNode* node, string name, AstNode* value){return 0;}
-    virtual int evaluate_ifExpr(AstNode* node, AstNode* boolExpr, vector<AstNode*> thenelse){return 0;}
+    virtual int evaluate_ifExpr(AstNode* node, AstNode* boolExpr, AstNode* then, AstNode* els){return 0;}
     virtual int evaluate_funcCall(AstNode* node){return 0;}
     virtual int evaluate_printing(AstNode* node){return 0;}
     virtual int evaluate_braces(AstNode* node, vector<AstNode*> nodes){return 0;}

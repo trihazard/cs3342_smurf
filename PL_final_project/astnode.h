@@ -25,6 +25,17 @@ public:
     int accept(Visitor *visitor);
 };
 
+////////////////
+// IdentNode
+class IdentNode : public AstNode {
+    string name;
+
+public:
+    IdentNode(string n);
+    string to_string();
+    int accept(Visitor *visitor);
+};
+
 ////////////////////
 //  BinopNode
 
@@ -89,6 +100,17 @@ class AssignmentNode : public AstNode {
 
 public:
     AssignmentNode(string n, AstNode* valueNode);
+    string to_string();
+    int accept(Visitor *visitor);
+};
+
+class IfNode : public AstNode {
+    AstNode* exp;
+    AstNode* then;
+    AstNode* els;
+
+public:
+    IfNode(AstNode* ex, AstNode* tru, AstNode* fal);
     string to_string();
     int accept(Visitor *visitor);
 };

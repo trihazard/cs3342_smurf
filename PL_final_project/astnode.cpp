@@ -18,6 +18,19 @@ int IntegerNode::accept(Visitor *visitor)
   return visitor->evaluate_integer(this, value);
 }
 
+///////////////
+// IdentNode
+IdentNode::IdentNode(string n) {
+    name = n;
+}
+
+string IdentNode::to_string() {
+    return name;
+}
+
+int IdentNode::accept(Visitor *visitor) {
+    //I think this is where I'd retrieve the value of a variable from my binding yes?
+}
 ////////////////////
 //  BinopNode
 
@@ -83,6 +96,9 @@ int LValNode::accept(Visitor *visitor) {
     return visitor->evaluate_varLVal(this, name);
 }
 
+
+//////////////////
+// AssignmentNode
 AssignmentNode::AssignmentNode(string n, AstNode* valueNode) {
     name = n;
     val = valueNode;
@@ -94,4 +110,24 @@ string AssignmentNode::to_string() {
 
 int AssignmentNode::accept(Visitor *visitor) {
     return visitor->evaluate_assignment(this, name, val);
+}
+
+
+/////////////////
+// IfNode
+IfNode::IfNode(AstNode* ex, AstNode* tru, AstNode* fal) {
+    exp = ex;
+    then = tru;
+    els = fal;
+}
+
+string IfNode::to_string() {
+    string toReturn = ("If " + exp->to_string() + "\n\t" + then->to_string());
+    if(els != nullptr)
+        toReturn += ("\nelse \n\t" + els->to_string());
+    return toReturn;
+}
+
+int IfNode::accept(Visitor *visitor) {
+    return visitor->evaluate_ifExpr(this, exp, then, els);
 }

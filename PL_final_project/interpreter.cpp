@@ -18,8 +18,25 @@ int Interpreter::evaluate_binop(AstNode *node, AstNode *left, std::string op, As
 }
 
 
-//errors saying cout is undefined
+//I don't think this is correct
 //int Interpreter::evaluate_printing(AstNode *node) {
 //    cout << "Print";
 //    cout << node->accept(this);
 //}
+
+//Not sure where to put the binding so it's accessible across everything
+//int Interpreter::evaluate_assignment(AstNode *node, string name, AstNode *value) {
+//    int trueVal = value->accept(this);
+//    //need a binding here to actually put the stuff in
+//}
+
+int Interpreter::evaluate_ifExpr(AstNode *node, AstNode *boolExpr, AstNode *then, AstNode *els) {
+    int pretendBool = boolExpr->accept(this);
+    int result = 0;
+    if(pretendBool)
+        result = then->accept(this);
+    else if(els != nullptr)
+        result = els->accept(this);
+
+    return result;
+}

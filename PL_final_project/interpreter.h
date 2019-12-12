@@ -30,6 +30,6 @@ public:
     int evaluate_printing(AstNode *node);
     int evaluate_braces(AstNode *node, vector<AstNode *> nodes);
     int evaluate_varDec(AstNode *node, AstNode *left, string op, AstNode *right);
-    int evaluate_assignment(AstNode *node, AstNode *left, string op, AstNode *right);
+    int evaluate_assignment(AstNode *node, string name, AstNode* value);
     int evaluate_ifExpr(AstNode *node, AstNode *boolExpr, AstNode *then, AstNode *els);
 };
